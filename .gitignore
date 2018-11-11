@@ -3,3 +3,4 @@
 .idea
 model1
 data
+**/__pycache__
