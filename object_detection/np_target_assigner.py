@@ -70,7 +70,8 @@ class TargetAssigner(object):
 		self._box_coder = box_coder
 		self._negative_class_weight = negative_class_weight
 		if unmatched_cls_target is None:
-			self._unmatched_cls_target = tf.constant([0], tf.float32)
+			# self._unmatched_cls_target = tf.constant([0], tf.float32)
+			self._unmatched_cls_target = np.array([0], dtype=np.float32)
 		else:
 			self._unmatched_cls_target = unmatched_cls_target
 
@@ -183,9 +184,6 @@ class TargetAssigner(object):
 	def _create_regression_targets(self, anchors, groundtruth_boxes, match):
 		"""Returns a regression target for each anchor.
 
-
-		
-
 		Args:
 		anchors: a BoxList representing M anchors
 		groundtruth_boxes: a BoxList representing N groundtruth_boxes
@@ -194,6 +192,9 @@ class TargetAssigner(object):
 		Returns:
 		reg_targets: a float32 tensor with shape [M, box_code_dimension]
 		"""
+
+		print("_create_regression_targets groundtruth_boxes shape:{}".format(groundtruth_boxes.get().shape))
+		
 		matched_gt_boxes = match.gather_based_on_match(groundtruth_boxes.get(),unmatched_value=np.zeros(4),ignored_value=np.zeros(4)) # expected shape: (M,4), where M=size of anchors
 
 		print("matched_gt_boxes: {}".format(matched_gt_boxes))
@@ -214,16 +215,32 @@ class TargetAssigner(object):
 
 		print("matched_gt_boxlist:{}  , anchors={}".format(matched_gt_boxlist, anchors.get()))
 		matched_reg_targets = self._box_coder.encode(matched_gt_boxlist, anchors)
-		match_results_shape = shape_utils.combined_static_and_dynamic_shape(
-			match.match_results)
+		# match_results_shape = shape_utils.combined_static_and_dynamic_shape(
+		# 	match.match_results)
+		match_results_shape = match.match_results.shape
+
+		print("match_results_shape:{}".format(match_results_shape))
 
 		# Zero out the unmatched and ignored regression targets.
-		unmatched_ignored_reg_targets = tf.tile(
-			self._default_regression_target(), [match_results_shape[0], 1])
+		# unmatched_ignored_reg_targets = tf.tile(self._default_regression_target(), [match_results_shape[0], 1])
+
+		unmatched_ignored_reg_targets = np.tile(self._default_regression_target(), [match_results_shape[0], 1])
+
+		print("unmatched_ignored_reg_targets shape={}".format(unmatched_ignored_reg_targets.shape))
+		
 		matched_anchors_mask = match.matched_column_indicator()
-		reg_targets = tf.where(matched_anchors_mask,
-								matched_reg_targets,
-								unmatched_ignored_reg_targets)
+
+		print("matched_anchors_mask shape:{}".format(matched_anchors_mask.shape))
+		print("matched_anchors_mask:{}".format(matched_anchors_mask))
+
+
+		# reg_targets = tf.where(matched_anchors_mask, matched_reg_targets, unmatched_ignored_reg_targets)
+
+		reg_targets = np.where(matched_anchors_mask, matched_reg_targets, unmatched_ignored_reg_targets)
+
+		print("reg_targets shape={}".format(reg_targets.shape))
+
+
 		return reg_targets
 
 	def _default_regression_target(self):
@@ -237,7 +254,8 @@ class TargetAssigner(object):
 		Returns:
 		default_target: a float32 tensor with shape [1, box_code_dimension]
 		"""
-		return tf.constant([self._box_coder.code_size*[0]], tf.float32)
+		# return tf.constant([self._box_coder.code_size*[0]], tf.float32)
+		return np.array([self._box_coder.code_size*[0]], dtype=np.float32)
 
 	def _create_classification_targets(self, groundtruth_labels, match):
 		"""Create classification targets for each anchor.
@@ -258,10 +276,16 @@ class TargetAssigner(object):
 		subshape [d_1, ..., d_k] is compatible with groundtruth_labels which has
 		shape [num_gt_boxes, d_1, d_2, ... d_k].
 		"""
-		return match.gather_based_on_match(
-			groundtruth_labels,
-			unmatched_value=self._unmatched_cls_target,
-			ignored_value=self._unmatched_cls_target)
+		print("inside _create_classification_targets ")
+
+		print("groundtruth_labels:{}".format(groundtruth_labels))
+
+		# wrapped_groundtruth_labels = np.expand_dims(groundtruth_labels, axis=1)
+		# print("wrapped_groundtruth_labels shape:{}".format(wrapped_groundtruth_labels.shape))
+
+		print("unmatched_cls_target shape:{}".format(self._unmatched_cls_target.shape))
+
+		return match.gather_based_on_match(groundtruth_labels,unmatched_value=self._unmatched_cls_target,ignored_value=self._unmatched_cls_target)
 
 	def _create_regression_weights(self, match, groundtruth_weights):
 		"""Set regression weight for each anchor.

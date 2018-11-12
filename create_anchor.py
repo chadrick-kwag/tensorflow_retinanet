@@ -2,7 +2,7 @@ import os
 
 
 os.environ['CUDA_DEVICE_ORDER'] = 'PCI_BUS_ID'
-os.environ['CUDA_VISIBLE_DEVICES'] = "2"
+os.environ['CUDA_VISIBLE_DEVICES'] = "0"
 
 
 import tensorflow as tf 
@@ -26,7 +26,26 @@ test_gt_labels_list= [ [
 
 test_gt_boxes_list = np.array(test_gt_boxes_list,dtype=np.float32)
 test_gt_labels_list = np.array(test_gt_labels_list, dtype=np.int32)
+# need to prepare this as one-hot vector format...
 
+def create_one_hot_vector_gt_labels(gt_labels_index_list, vector_length):
+    """
+    gt_labels_index_list: [batch,num_gt_labels] shaped np array with dtype int.
+    """
+    batch_size = gt_labels_index_list.shape[0]
+    gt_label_num  = gt_labels_index_list.shape[1]
+    empty_array = np.zeros((batch_size,gt_label_num, vector_length), dtype=np.float32)
+    # empty_array[np.arange(gt_label_num), gt_labels_index_list] = 1
+    
+    # print("batch size:{}".format(batch_size))
+    batch_list=[]
+
+    for batch_index in range(batch_size):
+        single_gt_labels_index_list = gt_labels_index_list[batch_index]
+        empty_array[batch_index,np.arange(gt_label_num), single_gt_labels_index_list] = 1.
+
+    print("finished empty_array:{}".format(empty_array))
+    return empty_array
 
 
 
@@ -68,7 +87,7 @@ num_scales = 2
 aspect_ratios = (1.0, 2.0, 0.5)
 anchor_scale = 4.0
 
-
+test_gt_labels_list = create_one_hot_vector_gt_labels(test_gt_labels_list, num_classes+1)
 
 
 num_anchors_per_loc = num_scales * len(aspect_ratios)
@@ -90,7 +109,8 @@ anchors = anchor_generator.boxes
 
 print("anchors shape:{}".format(anchors.shape))
 
-unmatched_class_label = tf.constant((num_classes + 1) * [0], tf.float32)
+# unmatched_class_label = tf.constant((num_classes + 1) * [0], tf.float32)
+unmatched_class_label = np.array((num_classes + 1) * [0], dtype=np.float32)
 target_assigner = create_target_assigner(unmatched_cls_target=unmatched_class_label)
 
 

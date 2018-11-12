@@ -97,7 +97,10 @@ class Match(object):
     Returns:
       column_indices: int32 tensor of shape [K] with column indices.
     """
-    return np.greater_equal(self._match_results, 0)
+    result = np.greater_equal(self._match_results, 0)
+    # reshape_result = result
+    reshape_result = np.reshape(result, (result.shape[0], 1))
+    return reshape_result
 
   def num_matched_columns(self):
     """Returns number (int32 scalar tensor) of matched columns."""
@@ -170,8 +173,15 @@ class Match(object):
     Returns:
       row_indices: int32 tensor of shape [K] with row indices.
     """
-    return self._reshape_and_cast(
-        np.take(self._match_results, self.matched_column_indices()))
+    print("!!! matched_row_indices used")
+
+    index_results_pylist = [self._match_results[index] for index in self.matched_column_indices().tolist()]
+    index_results = np.array(index_results_pylist)
+
+    # return self._reshape_and_cast(
+    #     np.take(self._match_results, self.matched_column_indices()))
+
+    return self._reshape_and_cast(index_results)
 
   def _reshape_and_cast(self, t):
     return np.reshape(t, (-1)).astype(np.int32)
@@ -201,11 +211,27 @@ class Match(object):
         The shape of the gathered tensor is [match_results.shape[0]] +
         input_tensor.shape[1:].
     """
-    input_tensor = tf.concat([tf.stack([ignored_value, unmatched_value]),
-                              input_tensor], axis=0)
-    gather_indices = tf.maximum(self.match_results + 2, 0)
-    gathered_tensor = tf.gather(input_tensor, gather_indices)
-    return gathered_tensor # expected shape: (M,4) where 4 is array of values containing info about gtbox-anchorbox offsets, M= size of match_results, which is = size of anchors
+    # input_tensor = tf.concat([tf.stack([ignored_value, unmatched_value]),
+    #                           input_tensor], axis=0)
+    # gather_indices = tf.maximum(self.match_results + 2, 0)
+    # gathered_tensor = tf.gather(input_tensor, gather_indices)
+    # return gathered_tensor # expected shape: (M,4) where 4 is array of values containing info about gtbox-anchorbox offsets, M= size of match_results, which is = size of anchors
+
+    print("input shape:{}".format(input_tensor.shape))
+
+
+    input_tensor = np.concatenate( [ np.stack([ignored_value, unmatched_value]) , input_tensor], axis=0 )
+
+    print("merged input_tensor shape={}".format(input_tensor.shape))
+    gather_indices = np.maximum(self.match_results+2, 0)
+    # gathered_array = np.take(input_tensor, gather_indices)
+
+    picked_pylist = [ input_tensor[index] for index in gather_indices.tolist()]
+
+    gathered_array = np.array(picked_pylist)
+
+    print("returning gathered_array shape={}".format(gathered_array.shape))
+    return gathered_array
 
 
 class Matcher(object):
